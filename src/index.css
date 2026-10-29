@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Miglioramento visivo globale del cursore */
+html, body {
+  cursor: default;
+}
+
+/* Rende i link e i bottoni molto più evidenti al passaggio del mouse */
+button, a, input[type="submit"], select {
+  cursor: pointer;
+}
+
+/* Opzionale: se vuoi un cursore personalizzato a forma di puntatore elegante */
+input[type="text"], input[type="tel"], input[type="password"] {
+  cursor: text;
+}
