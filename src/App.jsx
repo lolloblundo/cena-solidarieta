@@ -3,11 +3,11 @@ import { supabase } from './supabaseClient';
 import { 
   Calendar, MapPin, FileText, CheckCircle, ShieldCheck, 
   Download, Printer, Plus, Search, Filter, Trash2, Award, 
-  ChevronRight, X, Sparkles, Gift, Lock 
+  ChevronRight, X, Sparkles, Gift, Lock, Edit3, Save
 } from 'lucide-react';
 
 const MAX_CAPACITY = 320;
-const ADMIN_PASSWORD = "bettolino"; // Password aggiornata per il pannello staff
+const ADMIN_PASSWORD = "bettolino";
 
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState(() => {
@@ -34,6 +34,10 @@ export default function App() {
   const [adminFormData, setAdminFormData] = useState({
     name: '', phone: '', guests: 1, allergies: '', tablePreference: '', mustPay: true, hasPaid: false
   });
+
+  // Stato per la gestione della modifica note
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [noteInput, setNoteInput] = useState('');
 
   useEffect(() => {
     const handleLocationChange = () => {
@@ -122,6 +126,14 @@ export default function App() {
     }
   };
 
+  const handleSaveNote = async (id) => {
+    const { error } = await supabase.from('bookings').update({ table_preference: noteInput }).eq('id', id);
+    if (!error) {
+      setEditingNoteId(null);
+      fetchBookings();
+    }
+  };
+
   const handleAdminAddSubmit = async (e) => {
     e.preventDefault();
     if (!adminFormData.name) return;
@@ -146,7 +158,7 @@ export default function App() {
   };
 
   const exportCSV = () => {
-    const headers = ["Codice Voucher", "Nome e Cognome", "Telefono", "Posti", "Deve Pagare", "Stato Pagamento", "Allergie", "Vicinanza", "Data Registrazione"];
+    const headers = ["Codice Voucher", "Nome e Cognome", "Telefono", "Posti", "Deve Pagare", "Stato Pagamento", "Allergie", "Note / Tavolo", "Data Registrazione"];
     const rows = bookings.map(b => [
       b.reference_code, `"${b.full_name}"`, `"${b.phone}"`, b.guests, b.must_pay ? "SI" : "NO",
       b.must_pay ? (b.has_paid ? "PAGATO" : "DA PAGARE") : "-", `"${b.allergies || ''}"`, `"${b.table_preference || ''}"`, new Date(b.created_at).toLocaleDateString('it-IT')
@@ -343,7 +355,7 @@ export default function App() {
                           <th className="px-4 py-3 text-center">Posti</th>
                           <th className="px-4 py-3">Esente?</th>
                           <th className="px-4 py-3">Pagamento</th>
-                          <th className="px-4 py-3">Info Staff</th>
+                          <th className="px-4 py-3">Info / Note Staff</th>
                           <th className="px-4 py-3 text-right">Azioni</th>
                         </tr>
                       </thead>
@@ -364,8 +376,33 @@ export default function App() {
                               ) : <span className="text-slate-400 italic">Omaggio</span>}
                             </td>
                             <td className="px-4 py-3 text-slate-500 max-w-xs text-[11px]">
-                              {b.allergies && <div><span className="font-bold text-rose-600">Allergie:</span> {b.allergies}</div>}
-                              {b.table_preference && <div><span className="font-bold text-slate-700">Tavolo:</span> {b.table_preference}</div>}
+                              {b.allergies && <div className="mb-1"><span className="font-bold text-rose-600">Allergie:</span> {b.allergies}</div>}
+                              
+                              {editingNoteId === b.id ? (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <input 
+                                    type="text" 
+                                    value={noteInput} 
+                                    onChange={(e) => setNoteInput(e.target.value)} 
+                                    className="px-2 py-1 border rounded text-xs text-slate-800 w-full focus:ring-1 focus:ring-rose-800"
+                                    placeholder="Inserisci note o tavolo..."
+                                    autoFocus
+                                  />
+                                  <button onClick={() => handleSaveNote(b.id)} className="p-1 bg-emerald-700 text-white rounded"><Save className="w-3.5 h-3.5" /></button>
+                                  <button onClick={() => setEditingNoteId(null)} className="p-1 bg-slate-300 text-slate-700 rounded"><X className="w-3.5 h-3.5" /></button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-between group">
+                                  <span><strong className="text-slate-700">Note/Tavolo:</strong> {b.table_preference || <span className="text-slate-300 italic">Nessuna</span>}</span>
+                                  <button 
+                                    onClick={() => { setEditingNoteId(b.id); setNoteInput(b.table_preference || ''); }} 
+                                    className="p-1 text-slate-400 hover:text-rose-800"
+                                    title="Modifica Note"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-right space-x-2">
                               <button onClick={() => setSelectedVoucher(b)} className="px-2 py-1.5 bg-rose-800 text-white rounded text-[11px] font-medium"><FileText className="w-3.5 h-3.5 inline" /> Voucher</button>
@@ -392,6 +429,7 @@ export default function App() {
               <div><label className="block text-xs font-semibold mb-1">Telefono</label><input type="tel" value={adminFormData.phone} onChange={e => setAdminFormData({...adminFormData, phone: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-xs" /></div>
               <div><label className="block text-xs font-semibold mb-1">Posti</label><input type="number" min="1" value={adminFormData.guests} onChange={e => setAdminFormData({...adminFormData, guests: parseInt(e.target.value, 10)})} className="w-full px-3 py-2 border rounded-lg text-xs" /></div>
               <div><label className="block text-xs font-semibold mb-1">Allergie</label><input type="text" value={adminFormData.allergies} onChange={e => setAdminFormData({...adminFormData, allergies: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-xs" /></div>
+              <div><label className="block text-xs font-semibold mb-1">Note Staff / Tavolo</label><input type="text" value={adminFormData.tablePreference} onChange={e => setAdminFormData({...adminFormData, tablePreference: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-xs" /></div>
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <div><label className="block text-[11px] font-semibold mb-1">Deve Pagare?</label><select value={adminFormData.mustPay ? 'yes' : 'no'} onChange={e => setAdminFormData({...adminFormData, mustPay: e.target.value === 'yes'})} className="w-full px-3 py-2 border rounded-lg text-xs bg-white"><option value="yes">SÌ (Pagante)</option><option value="no">NO (Esente)</option></select></div>
                 {adminFormData.mustPay && <div><label className="block text-[11px] font-semibold mb-1">Stato</label><select value={adminFormData.hasPaid ? 'paid' : 'unpaid'} onChange={e => setAdminFormData({...adminFormData, hasPaid: e.target.value === 'paid'})} className="w-full px-3 py-2 border rounded-lg text-xs bg-white"><option value="unpaid">DA PAGARE</option><option value="paid">PAGATO</option></select></div>}
@@ -416,6 +454,7 @@ export default function App() {
                 <div><span className="text-slate-400 block text-[10px] uppercase font-semibold">Stato Contabile Staff</span><span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold ${!selectedVoucher.must_pay ? 'bg-slate-200 text-slate-700' : (selectedVoucher.has_paid ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-800')}`}>{!selectedVoucher.must_pay ? 'ESENTE / OMAGGIO' : (selectedVoucher.has_paid ? 'PAGATO' : 'DA PAGARE ALL\'INGRESSO')}</span></div>
               </div>
               {selectedVoucher.allergies && <div className="text-xs bg-amber-50 p-2.5 rounded border border-amber-200 mb-4"><span className="font-bold text-amber-900">Allergie/Note:</span> {selectedVoucher.allergies}</div>}
+              {selectedVoucher.table_preference && <div className="text-xs bg-slate-50 p-2.5 rounded border border-slate-200 mb-4"><span className="font-bold text-slate-800">Note Staff / Tavolo:</span> {selectedVoucher.table_preference}</div>}
               <div className="text-[9px] text-slate-400 text-center uppercase tracking-wider flex justify-between items-center pt-2"><span>Cena della Solidarietà</span><span>Mostrare questo voucher all'ingresso</span></div>
             </div>
           </div>
