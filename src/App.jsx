@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient';
 import { 
   Calendar, MapPin, FileText, CheckCircle, ShieldCheck, 
   Download, Printer, Plus, Search, Filter, Trash2, Award, 
-  ChevronRight, X, Sparkles, Gift, Lock, Edit3, Save
+  ChevronRight, X, Sparkles, Gift, Lock, Edit3, User, Phone, Users, AlertCircle, Bookmark, CreditCard
 } from 'lucide-react';
 
 const MAX_CAPACITY = 320;
@@ -30,14 +30,15 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPayment, setFilterPayment] = useState('all');
   const [selectedVoucher, setSelectedVoucher] = useState(null);
+  
+  // Modali Admin
   const [showAdminAddModal, setShowAdminAddModal] = useState(false);
   const [adminFormData, setAdminFormData] = useState({
     name: '', phone: '', guests: 1, allergies: '', tablePreference: '', mustPay: true, hasPaid: false
   });
 
-  // Stato per la gestione della modifica note
-  const [editingNoteId, setEditingNoteId] = useState(null);
-  const [noteInput, setNoteInput] = useState('');
+  // Modal di Modifica Completa Prenotazione
+  const [editingBooking, setEditingBooking] = useState(null);
 
   useEffect(() => {
     const handleLocationChange = () => {
@@ -126,14 +127,6 @@ export default function App() {
     }
   };
 
-  const handleSaveNote = async (id) => {
-    const { error } = await supabase.from('bookings').update({ table_preference: noteInput }).eq('id', id);
-    if (!error) {
-      setEditingNoteId(null);
-      fetchBookings();
-    }
-  };
-
   const handleAdminAddSubmit = async (e) => {
     e.preventDefault();
     if (!adminFormData.name) return;
@@ -154,6 +147,28 @@ export default function App() {
       setShowAdminAddModal(false);
       setAdminFormData({ name: '', phone: '', guests: 1, allergies: '', tablePreference: '', mustPay: true, hasPaid: false });
       fetchBookings();
+    }
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editingBooking) return;
+
+    const { error } = await supabase.from('bookings').update({
+      full_name: editingBooking.full_name.trim(),
+      phone: editingBooking.phone.trim(),
+      guests: parseInt(editingBooking.guests, 10),
+      allergies: editingBooking.allergies ? editingBooking.allergies.trim() : '',
+      table_preference: editingBooking.table_preference ? editingBooking.table_preference.trim() : '',
+      must_pay: editingBooking.must_pay,
+      has_paid: editingBooking.must_pay ? editingBooking.has_paid : false
+    }).eq('id', editingBooking.id);
+
+    if (!error) {
+      setEditingBooking(null);
+      fetchBookings();
+    } else {
+      alert("Errore durante il salvataggio della modifica.");
     }
   };
 
@@ -307,9 +322,9 @@ export default function App() {
                     <p className="text-xs text-slate-500 mt-1">Cena della Solidarietà - Cloud Supabase</p>
                   </div>
                   <div className="flex space-x-2">
-                    <button onClick={() => setShowAdminAddModal(true)} className="px-4 py-2 bg-rose-800 text-white text-xs font-bold rounded-xl flex items-center space-x-1"><Plus className="w-4 h-4" /><span>Nuova</span></button>
-                    <button onClick={exportCSV} className="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl border flex items-center space-x-1"><Download className="w-4 h-4" /><span>Esporta CSV</span></button>
-                    <button onClick={fetchBookings} className="px-4 py-2 bg-emerald-700 text-white text-xs font-bold rounded-xl">Aggiorna Dati</button>
+                    <button onClick={() => setShowAdminAddModal(true)} className="px-4 py-2 bg-rose-800 hover:bg-rose-900 text-white text-xs font-bold rounded-xl flex items-center space-x-1 shadow-sm transition"><Plus className="w-4 h-4" /><span>Nuova</span></button>
+                    <button onClick={exportCSV} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border flex items-center space-x-1 transition"><Download className="w-4 h-4" /><span>Esporta CSV</span></button>
+                    <button onClick={fetchBookings} className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl transition shadow-sm">Aggiorna Dati</button>
                   </div>
                 </div>
 
@@ -335,14 +350,14 @@ export default function App() {
                   <div className="p-4 border-b flex flex-col md:flex-row gap-3 justify-between items-center bg-slate-50">
                     <div className="relative w-full md:w-80">
                       <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-                      <input type="text" placeholder="Cerca..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-4 py-2 rounded-xl border text-xs focus:ring-2 focus:ring-rose-800 bg-white outline-none" />
+                      <input type="text" placeholder="Cerca referente, codice o tel..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-4 py-2 rounded-xl border text-xs focus:ring-2 focus:ring-rose-800 bg-white outline-none" />
                     </div>
                     <div className="flex items-center space-x-2 w-full md:w-auto overflow-x-auto">
                       <Filter className="w-3.5 h-3.5 text-slate-500" />
-                      <button onClick={() => setFilterPayment('all')} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${filterPayment === 'all' ? 'bg-rose-900 text-white' : 'bg-white text-slate-600 border'}`}>Tutti</button>
-                      <button onClick={() => setFilterPayment('unpaid')} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${filterPayment === 'unpaid' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600 border'}`}>Da Pagare</button>
-                      <button onClick={() => setFilterPayment('paid')} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${filterPayment === 'paid' ? 'bg-emerald-700 text-white' : 'bg-white text-slate-600 border'}`}>Pagati</button>
-                      <button onClick={() => setFilterPayment('exempt')} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${filterPayment === 'exempt' ? 'bg-slate-600 text-white' : 'bg-white text-slate-600 border'}`}>Esenti</button>
+                      <button onClick={() => setFilterPayment('all')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${filterPayment === 'all' ? 'bg-rose-900 text-white' : 'bg-white text-slate-600 border'}`}>Tutti</button>
+                      <button onClick={() => setFilterPayment('unpaid')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${filterPayment === 'unpaid' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600 border'}`}>Da Pagare</button>
+                      <button onClick={() => setFilterPayment('paid')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${filterPayment === 'paid' ? 'bg-emerald-700 text-white' : 'bg-white text-slate-600 border'}`}>Pagati</button>
+                      <button onClick={() => setFilterPayment('exempt')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${filterPayment === 'exempt' ? 'bg-slate-600 text-white' : 'bg-white text-slate-600 border'}`}>Esenti</button>
                     </div>
                   </div>
 
@@ -361,52 +376,35 @@ export default function App() {
                       </thead>
                       <tbody className="divide-y">
                         {loading ? <tr><td colSpan="7" className="text-center py-8">Caricamento in corso...</td></tr> : filteredBookings.map((b) => (
-                          <tr key={b.id} className="hover:bg-slate-50">
-                            <td className="px-4 py-3 font-mono font-bold">{b.reference_code}</td>
-                            <td className="px-4 py-3"><div className="font-bold">{b.full_name}</div><div className="text-slate-500">{b.phone}</div></td>
+                          <tr key={b.id} className="hover:bg-slate-50/80 transition">
+                            <td className="px-4 py-3 font-mono font-bold text-rose-900">{b.reference_code}</td>
+                            <td className="px-4 py-3"><div className="font-bold text-slate-900">{b.full_name}</div><div className="text-slate-500">{b.phone}</div></td>
                             <td className="px-4 py-3 text-center font-bold bg-slate-100 rounded-md">{b.guests}</td>
                             <td className="px-4 py-3">
-                              <button onClick={() => toggleMustPay(b.id, b.must_pay)} className={`px-2 py-1 rounded text-[10px] font-bold ${!b.must_pay ? 'bg-slate-200 text-slate-700' : 'bg-rose-50 text-rose-900 border border-rose-200'}`}>{!b.must_pay ? 'SI (Esente)' : 'NO (Pagante)'}</button>
+                              <button onClick={() => toggleMustPay(b.id, b.must_pay)} className={`px-2 py-1 rounded text-[10px] font-bold transition ${!b.must_pay ? 'bg-slate-200 text-slate-700' : 'bg-rose-50 text-rose-900 border border-rose-200'}`}>{!b.must_pay ? 'SI (Esente)' : 'NO (Pagante)'}</button>
                             </td>
                             <td className="px-4 py-3">
                               {b.must_pay ? (
-                                <button onClick={() => toggleHasPaid(b.id, b.has_paid)} className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${b.has_paid ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-800'}`}>
+                                <button onClick={() => toggleHasPaid(b.id, b.has_paid)} className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition ${b.has_paid ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-800'}`}>
                                   {b.has_paid ? 'PAGATO' : 'DA PAGARE'}
                                 </button>
                               ) : <span className="text-slate-400 italic">Omaggio</span>}
                             </td>
-                            <td className="px-4 py-3 text-slate-500 max-w-xs text-[11px]">
-                              {b.allergies && <div className="mb-1"><span className="font-bold text-rose-600">Allergie:</span> {b.allergies}</div>}
-                              
-                              {editingNoteId === b.id ? (
-                                <div className="flex items-center gap-1 mt-1">
-                                  <input 
-                                    type="text" 
-                                    value={noteInput} 
-                                    onChange={(e) => setNoteInput(e.target.value)} 
-                                    className="px-2 py-1 border rounded text-xs text-slate-800 w-full focus:ring-1 focus:ring-rose-800"
-                                    placeholder="Inserisci note o tavolo..."
-                                    autoFocus
-                                  />
-                                  <button onClick={() => handleSaveNote(b.id)} className="p-1 bg-emerald-700 text-white rounded"><Save className="w-3.5 h-3.5" /></button>
-                                  <button onClick={() => setEditingNoteId(null)} className="p-1 bg-slate-300 text-slate-700 rounded"><X className="w-3.5 h-3.5" /></button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center justify-between group">
-                                  <span><strong className="text-slate-700">Note/Tavolo:</strong> {b.table_preference || <span className="text-slate-300 italic">Nessuna</span>}</span>
-                                  <button 
-                                    onClick={() => { setEditingNoteId(b.id); setNoteInput(b.table_preference || ''); }} 
-                                    className="p-1 text-slate-400 hover:text-rose-800"
-                                    title="Modifica Note"
-                                  >
-                                    <Edit3 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              )}
+                            <td className="px-4 py-3 text-slate-600 max-w-xs text-[11px]">
+                              {b.allergies && <div className="mb-0.5"><span className="font-bold text-rose-600">Allergie:</span> {b.allergies}</div>}
+                              <div><strong className="text-slate-800">Note/Tavolo:</strong> {b.table_preference || <span className="text-slate-300 italic">Nessuna</span>}</div>
                             </td>
-                            <td className="px-4 py-3 text-right space-x-2">
-                              <button onClick={() => setSelectedVoucher(b)} className="px-2 py-1.5 bg-rose-800 text-white rounded text-[11px] font-medium"><FileText className="w-3.5 h-3.5 inline" /> Voucher</button>
-                              <button onClick={() => deleteBooking(b.id)} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4" /></button>
+                            <td className="px-4 py-3 text-right space-x-1.5">
+                              <button 
+                                onClick={() => setEditingBooking({...b})} 
+                                className="inline-flex items-center px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-[11px] font-semibold transition shadow-sm"
+                                title="Modifica Completa"
+                              >
+                                <Edit3 className="w-3.5 h-3.5 mr-1 text-amber-300" />
+                                Modifica
+                              </button>
+                              <button onClick={() => setSelectedVoucher(b)} className="px-2.5 py-1.5 bg-rose-800 hover:bg-rose-900 text-white rounded-lg text-[11px] font-medium transition"><FileText className="w-3.5 h-3.5 inline mr-1" /> Voucher</button>
+                              <button onClick={() => deleteBooking(b.id)} className="p-1.5 text-rose-600 hover:bg-rose-100 rounded-lg transition"><Trash2 className="w-4 h-4" /></button>
                             </td>
                           </tr>
                         ))}
@@ -419,6 +417,156 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Modal di Modifica Completa Elegantissima & Scrollabile */}
+      {editingBooking && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-rose-100 overflow-hidden my-auto max-h-[90vh] flex flex-col">
+            
+            {/* Header Modale */}
+            <div className="bg-gradient-to-r from-rose-900 to-slate-900 text-white p-5 flex justify-between items-center flex-shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-white/10 rounded-xl border border-white/20">
+                  <Edit3 className="w-5 h-5 text-amber-300" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold leading-tight">Modifica Prenotazione</h3>
+                  <p className="text-xs text-rose-200 font-mono">Codice: {editingBooking.reference_code}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setEditingBooking(null)}
+                className="p-1.5 rounded-full hover:bg-white/10 text-white/80 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form Scrollabile */}
+            <form onSubmit={handleSaveEdit} className="p-6 space-y-4 overflow-y-auto flex-grow">
+              
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-rose-800" /> Nome e Cognome Referente *
+                </label>
+                <input 
+                  type="text" 
+                  required 
+                  value={editingBooking.full_name} 
+                  onChange={e => setEditingBooking({...editingBooking, full_name: e.target.value})} 
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-800 outline-none text-sm font-medium" 
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-rose-800" /> Telefono
+                  </label>
+                  <input 
+                    type="tel" 
+                    value={editingBooking.phone} 
+                    onChange={e => setEditingBooking({...editingBooking, phone: e.target.value})} 
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-800 outline-none text-sm" 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-rose-800" /> Numero Posti *
+                  </label>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    required 
+                    value={editingBooking.guests} 
+                    onChange={e => setEditingBooking({...editingBooking, guests: e.target.value})} 
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-800 outline-none text-sm font-bold text-slate-900 bg-slate-50" 
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-600" /> Allergie / Intolleranze
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="Nessuna intolleranza segnalata"
+                  value={editingBooking.allergies || ''} 
+                  onChange={e => setEditingBooking({...editingBooking, allergies: e.target.value})} 
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-800 outline-none text-sm" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                  <Bookmark className="w-3.5 h-3.5 text-rose-800" /> Note Staff / Tavolo Desiderato
+                </label>
+                <textarea 
+                  rows="2"
+                  placeholder="Aggiungi indicazioni sul tavolo o note dello staff..."
+                  value={editingBooking.table_preference || ''} 
+                  onChange={e => setEditingBooking({...editingBooking, table_preference: e.target.value})} 
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-800 outline-none text-sm resize-none" 
+                />
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+                <div className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <CreditCard className="w-4 h-4 text-emerald-700" /> Gestione Amministrativa
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Qualifica Ospite</label>
+                    <select 
+                      value={editingBooking.must_pay ? 'yes' : 'no'} 
+                      onChange={e => setEditingBooking({...editingBooking, must_pay: e.target.value === 'yes'})} 
+                      className="w-full px-3 py-2 border rounded-xl text-xs font-bold bg-white focus:ring-2 focus:ring-rose-800"
+                    >
+                      <option value="yes">SÌ (Pagante - 30€)</option>
+                      <option value="no">NO (Esente / Omaggio)</option>
+                    </select>
+                  </div>
+
+                  {editingBooking.must_pay && (
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Stato Incasso</label>
+                      <select 
+                        value={editingBooking.has_paid ? 'paid' : 'unpaid'} 
+                        onChange={e => setEditingBooking({...editingBooking, has_paid: e.target.value === 'paid'})} 
+                        className="w-full px-3 py-2 border rounded-xl text-xs font-bold bg-white focus:ring-2 focus:ring-rose-800"
+                      >
+                        <option value="unpaid">DA PAGARE</option>
+                        <option value="paid">PAGATO</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Bottoni di Azione */}
+              <div className="flex space-x-3 pt-2 flex-shrink-0">
+                <button 
+                  type="submit" 
+                  className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs shadow-md transition"
+                >
+                  Salva Modifiche
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setEditingBooking(null)} 
+                  className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition"
+                >
+                  Annulla
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
 
       {showAdminAddModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
