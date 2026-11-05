@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient';
 import { 
   Calendar, MapPin, FileText, CheckCircle, ShieldCheck, 
   Download, Printer, Plus, Search, Filter, Trash2, Award, 
-  ChevronRight, X, Sparkles, Gift, Lock, Edit3, User, Phone, Users, AlertCircle, Bookmark, CreditCard
+  ChevronRight, X, Sparkles, Gift, Lock, Edit3, User, Phone, Users, AlertCircle, Bookmark, CreditCard, Ticket
 } from 'lucide-react';
 
 const MAX_CAPACITY = 320;
@@ -34,7 +34,7 @@ export default function App() {
   // Modali Admin
   const [showAdminAddModal, setShowAdminAddModal] = useState(false);
   const [adminFormData, setAdminFormData] = useState({
-    name: '', phone: '', guests: 1, allergies: '', tablePreference: '', mustPay: true, hasPaid: false
+    name: '', phone: '', guests: 1, allergies: '', tablePreference: '', mustPay: true, hasPaid: false, ticketDelivered: false
   });
 
   // Modal di Modifica Completa Prenotazione
@@ -61,7 +61,14 @@ export default function App() {
   const fetchBookings = async () => {
     setLoading(true);
     const { data, error } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
-    if (!error) setBookings(data || []);
+    if (!error) {
+      // Riconosce automaticamente anche se 'consegnato' era stato scritto nel testo delle note
+      const formattedData = (data || []).map(b => ({
+        ...b,
+        ticket_delivered: b.ticket_delivered || (b.table_preference && b.table_preference.toLowerCase().includes('consegnato'))
+      }));
+      setBookings(formattedData);
+    }
     setLoading(false);
   };
 
@@ -120,6 +127,11 @@ export default function App() {
     if (!error) fetchBookings();
   };
 
+  const toggleTicketDelivered = async (id, currentStatus) => {
+    const { error } = await supabase.from('bookings').update({ ticket_delivered: !currentStatus }).eq('id', id);
+    if (!error) fetchBookings();
+  };
+
   const deleteBooking = async (id) => {
     if (window.confirm("Sei sicuro di voler eliminare questa prenotazione dal database? L'operazione non è reversibile.")) {
       const { error } = await supabase.from('bookings').delete().eq('id', id);
@@ -140,12 +152,13 @@ export default function App() {
       allergies: adminFormData.allergies.trim(),
       table_preference: adminFormData.tablePreference.trim(),
       must_pay: adminFormData.mustPay,
-      has_paid: adminFormData.mustPay ? adminFormData.hasPaid : false
+      has_paid: adminFormData.mustPay ? adminFormData.hasPaid : false,
+      ticket_delivered: adminFormData.ticketDelivered
     }]);
 
     if (!error) {
       setShowAdminAddModal(false);
-      setAdminFormData({ name: '', phone: '', guests: 1, allergies: '', tablePreference: '', mustPay: true, hasPaid: false });
+      setAdminFormData({ name: '', phone: '', guests: 1, allergies: '', tablePreference: '', mustPay: true, hasPaid: false, ticketDelivered: false });
       fetchBookings();
     }
   };
@@ -161,7 +174,8 @@ export default function App() {
       allergies: editingBooking.allergies ? editingBooking.allergies.trim() : '',
       table_preference: editingBooking.table_preference ? editingBooking.table_preference.trim() : '',
       must_pay: editingBooking.must_pay,
-      has_paid: editingBooking.must_pay ? editingBooking.has_paid : false
+      has_paid: editingBooking.must_pay ? editingBooking.has_paid : false,
+      ticket_delivered: editingBooking.ticket_delivered || false
     }).eq('id', editingBooking.id);
 
     if (!error) {
@@ -173,10 +187,10 @@ export default function App() {
   };
 
   const exportCSV = () => {
-    const headers = ["Codice Voucher", "Nome e Cognome", "Telefono", "Posti", "Deve Pagare", "Stato Pagamento", "Allergie", "Note / Tavolo", "Data Registrazione"];
+    const headers = ["Codice Voucher", "Nome e Cognome", "Telefono", "Posti", "Deve Pagare", "Stato Pagamento", "Biglietto Consegnato", "Allergie", "Note / Tavolo", "Data Registrazione"];
     const rows = bookings.map(b => [
       b.reference_code, `"${b.full_name}"`, `"${b.phone}"`, b.guests, b.must_pay ? "SI" : "NO",
-      b.must_pay ? (b.has_paid ? "PAGATO" : "DA PAGARE") : "-", `"${b.allergies || ''}"`, `"${b.table_preference || ''}"`, new Date(b.created_at).toLocaleDateString('it-IT')
+      b.must_pay ? (b.has_paid ? "PAGATO" : "DA PAGARE") : "-", b.ticket_delivered ? "CONSEGNATO" : "DA CONSEGNARE", `"${b.allergies || ''}"`, `"${b.table_preference || ''}"`, new Date(b.created_at).toLocaleDateString('it-IT')
     ]);
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
     const link = document.createElement("a");
@@ -340,6 +354,11 @@ export default function App() {
                     <div className="text-xs text-amber-600 mt-1 font-medium">{bookings.filter(b => b.must_pay && !b.has_paid).length} Da Incassare</div>
                   </div>
                   <div className="bg-white p-4 rounded-xl border shadow-sm">
+                    <div className="text-xs font-medium text-slate-500 uppercase">Biglietti Consegnati</div>
+                    <div className="text-2xl font-extrabold text-blue-900 mt-1">{bookings.filter(b => b.ticket_delivered).length}</div>
+                    <div className="text-xs text-slate-400 mt-1">Consegne effettuate</div>
+                  </div>
+                  <div className="bg-white p-4 rounded-xl border shadow-sm">
                     <div className="text-xs font-medium text-slate-500 uppercase">Esenti / Omaggio</div>
                     <div className="text-2xl font-extrabold text-slate-700 mt-1">{bookings.filter(b => !b.must_pay).reduce((sum, b) => sum + b.guests, 0)}</div>
                     <div className="text-xs text-slate-400 mt-1">Ospiti accreditati</div>
@@ -370,12 +389,13 @@ export default function App() {
                           <th className="px-4 py-3 text-center">Posti</th>
                           <th className="px-4 py-3">Esente?</th>
                           <th className="px-4 py-3">Pagamento</th>
+                          <th className="px-4 py-3">Biglietto</th>
                           <th className="px-4 py-3">Info / Note Staff</th>
                           <th className="px-4 py-3 text-right">Azioni</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {loading ? <tr><td colSpan="7" className="text-center py-8">Caricamento in corso...</td></tr> : filteredBookings.map((b) => (
+                        {loading ? <tr><td colSpan="8" className="text-center py-8">Caricamento in corso...</td></tr> : filteredBookings.map((b) => (
                           <tr key={b.id} className="hover:bg-slate-50/80 transition">
                             <td className="px-4 py-3 font-mono font-bold text-rose-900">{b.reference_code}</td>
                             <td className="px-4 py-3"><div className="font-bold text-slate-900">{b.full_name}</div><div className="text-slate-500">{b.phone}</div></td>
@@ -389,6 +409,15 @@ export default function App() {
                                   {b.has_paid ? 'PAGATO' : 'DA PAGARE'}
                                 </button>
                               ) : <span className="text-slate-400 italic">Omaggio</span>}
+                            </td>
+                            <td className="px-4 py-3">
+                              <button 
+                                onClick={() => toggleTicketDelivered(b.id, b.ticket_delivered)} 
+                                className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition flex items-center gap-1 ${b.ticket_delivered ? 'bg-blue-100 text-blue-900 border border-blue-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                              >
+                                <Ticket className="w-3 h-3" />
+                                {b.ticket_delivered ? 'CONSEGNATO' : 'DA CONS.'}
+                              </button>
                             </td>
                             <td className="px-4 py-3 text-slate-600 max-w-xs text-[11px]">
                               {b.allergies && <div className="mb-0.5"><span className="font-bold text-rose-600">Allergie:</span> {b.allergies}</div>}
@@ -418,12 +447,11 @@ export default function App() {
         )}
       </main>
 
-      {/* Modal di Modifica Completa Elegantissima & Scrollabile */}
+      {/* Modal di Modifica Completa Scrollabile */}
       {editingBooking && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-rose-100 overflow-hidden my-auto max-h-[90vh] flex flex-col">
             
-            {/* Header Modale */}
             <div className="bg-gradient-to-r from-rose-900 to-slate-900 text-white p-5 flex justify-between items-center flex-shrink-0">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-white/10 rounded-xl border border-white/20">
@@ -442,7 +470,6 @@ export default function App() {
               </button>
             </div>
 
-            {/* Form Scrollabile */}
             <form onSubmit={handleSaveEdit} className="p-6 space-y-4 overflow-y-auto flex-grow">
               
               <div>
@@ -514,7 +541,7 @@ export default function App() {
 
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
                 <div className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <CreditCard className="w-4 h-4 text-emerald-700" /> Gestione Amministrativa
+                  <CreditCard className="w-4 h-4 text-emerald-700" /> Gestione Pagamento & Consegna
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -543,10 +570,23 @@ export default function App() {
                       </select>
                     </div>
                   )}
+
+                  <div className="sm:col-span-2 pt-1">
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
+                      <Ticket className="w-3.5 h-3.5 text-blue-800" /> Stato Consegna Biglietto
+                    </label>
+                    <select 
+                      value={editingBooking.ticket_delivered ? 'delivered' : 'pending'} 
+                      onChange={e => setEditingBooking({...editingBooking, ticket_delivered: e.target.value === 'delivered'})} 
+                      className="w-full px-3 py-2 border rounded-xl text-xs font-bold bg-white focus:ring-2 focus:ring-rose-800"
+                    >
+                      <option value="pending">DA CONSEGNARE</option>
+                      <option value="delivered">CONSEGNATO</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* Bottoni di Azione */}
               <div className="flex space-x-3 pt-2 flex-shrink-0">
                 <button 
                   type="submit" 
@@ -575,13 +615,14 @@ export default function App() {
             <form onSubmit={handleAdminAddSubmit} className="space-y-4">
               <div><label className="block text-xs font-semibold mb-1">Nome *</label><input type="text" required value={adminFormData.name} onChange={e => setAdminFormData({...adminFormData, name: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-xs" /></div>
               <div><label className="block text-xs font-semibold mb-1">Telefono</label><input type="tel" value={adminFormData.phone} onChange={e => setAdminFormData({...adminFormData, phone: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-xs" /></div>
-              <div><label className="block text-xs font-semibold mb-1">Posti</label><input type="number" min="1" value={adminFormData.guests} onChange={e => setAdminFormData({...adminFormData, guests: parseInt(e.target.value, 10)})} className="w-full px-3 py-2 border rounded-lg text-xs" /></div>
+              <div><label className="block text-xs font-semibold mb-1">Posti</label><input type="number" min="1" value={adminFormData.guests} onChange={e => setAdminFormData({...adminFormData, guests: parseInt(adminFormData.guests, 10)})} className="w-full px-3 py-2 border rounded-lg text-xs" /></div>
               <div><label className="block text-xs font-semibold mb-1">Allergie</label><input type="text" value={adminFormData.allergies} onChange={e => setAdminFormData({...adminFormData, allergies: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-xs" /></div>
               <div><label className="block text-xs font-semibold mb-1">Note Staff / Tavolo</label><input type="text" value={adminFormData.tablePreference} onChange={e => setAdminFormData({...adminFormData, tablePreference: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-xs" /></div>
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <div><label className="block text-[11px] font-semibold mb-1">Deve Pagare?</label><select value={adminFormData.mustPay ? 'yes' : 'no'} onChange={e => setAdminFormData({...adminFormData, mustPay: e.target.value === 'yes'})} className="w-full px-3 py-2 border rounded-lg text-xs bg-white"><option value="yes">SÌ (Pagante)</option><option value="no">NO (Esente)</option></select></div>
                 {adminFormData.mustPay && <div><label className="block text-[11px] font-semibold mb-1">Stato</label><select value={adminFormData.hasPaid ? 'paid' : 'unpaid'} onChange={e => setAdminFormData({...adminFormData, hasPaid: e.target.value === 'paid'})} className="w-full px-3 py-2 border rounded-lg text-xs bg-white"><option value="unpaid">DA PAGARE</option><option value="paid">PAGATO</option></select></div>}
               </div>
+              <div><label className="block text-[11px] font-semibold mb-1">Biglietto Consegnato?</label><select value={adminFormData.ticketDelivered ? 'yes' : 'no'} onChange={e => setAdminFormData({...adminFormData, ticketDelivered: e.target.value === 'yes'})} className="w-full px-3 py-2 border rounded-lg text-xs bg-white"><option value="no">NO (Da Consegnare)</option><option value="yes">SÌ (Consegnato)</option></select></div>
               <button type="submit" className="w-full py-2.5 bg-rose-800 text-white font-bold rounded-xl text-xs mt-4">Registra Forzata</button>
             </form>
           </div>
