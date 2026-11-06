@@ -62,7 +62,6 @@ export default function App() {
     setLoading(true);
     const { data, error } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
     if (!error) {
-      // Riconosce automaticamente anche se 'consegnato' era stato scritto nel testo delle note
       const formattedData = (data || []).map(b => ({
         ...b,
         ticket_delivered: b.ticket_delivered || (b.table_preference && b.table_preference.toLowerCase().includes('consegnato'))
@@ -148,7 +147,7 @@ export default function App() {
       reference_code: uniqueId,
       full_name: adminFormData.name.trim(),
       phone: adminFormData.phone.trim() || 'Non specificato',
-      guests: parseInt(adminFormData.guests, 10),
+      guests: parseInt(adminFormData.guests, 10) || 1,
       allergies: adminFormData.allergies.trim(),
       table_preference: adminFormData.tablePreference.trim(),
       must_pay: adminFormData.mustPay,
@@ -170,7 +169,7 @@ export default function App() {
     const { error } = await supabase.from('bookings').update({
       full_name: editingBooking.full_name.trim(),
       phone: editingBooking.phone.trim(),
-      guests: parseInt(editingBooking.guests, 10),
+      guests: parseInt(editingBooking.guests, 10) || 1,
       allergies: editingBooking.allergies ? editingBooking.allergies.trim() : '',
       table_preference: editingBooking.table_preference ? editingBooking.table_preference.trim() : '',
       must_pay: editingBooking.must_pay,
@@ -360,7 +359,7 @@ export default function App() {
                   </div>
                   <div className="bg-white p-4 rounded-xl border shadow-sm">
                     <div className="text-xs font-medium text-slate-500 uppercase">Esenti / Omaggio</div>
-                    <div className="text-2xl font-extrabold text-slate-700 mt-1">{bookings.filter(b => !b.must_pay).reduce((sum, b) => sum + b.guests, 0)}</div>
+                    <div className="text-2xl font-extrabold text-slate-700 mt-1">{bookings.filter(b => !b.must_pay).reduce((sum, b) => sum + Number(b.guests), 0)}</div>
                     <div className="text-xs text-slate-400 mt-1">Ospiti accreditati</div>
                   </div>
                 </div>
@@ -608,6 +607,7 @@ export default function App() {
         </div>
       )}
 
+      {/* Modal Nuova Prenotazione Staff Corretta */}
       {showAdminAddModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border">
@@ -615,7 +615,7 @@ export default function App() {
             <form onSubmit={handleAdminAddSubmit} className="space-y-4">
               <div><label className="block text-xs font-semibold mb-1">Nome *</label><input type="text" required value={adminFormData.name} onChange={e => setAdminFormData({...adminFormData, name: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-xs" /></div>
               <div><label className="block text-xs font-semibold mb-1">Telefono</label><input type="tel" value={adminFormData.phone} onChange={e => setAdminFormData({...adminFormData, phone: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-xs" /></div>
-              <div><label className="block text-xs font-semibold mb-1">Posti</label><input type="number" min="1" value={adminFormData.guests} onChange={e => setAdminFormData({...adminFormData, guests: parseInt(adminFormData.guests, 10)})} className="w-full px-3 py-2 border rounded-lg text-xs" /></div>
+              <div><label className="block text-xs font-semibold mb-1">Posti</label><input type="number" min="1" required value={adminFormData.guests} onChange={e => setAdminFormData({...adminFormData, guests: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-xs font-bold" /></div>
               <div><label className="block text-xs font-semibold mb-1">Allergie</label><input type="text" value={adminFormData.allergies} onChange={e => setAdminFormData({...adminFormData, allergies: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-xs" /></div>
               <div><label className="block text-xs font-semibold mb-1">Note Staff / Tavolo</label><input type="text" value={adminFormData.tablePreference} onChange={e => setAdminFormData({...adminFormData, tablePreference: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-xs" /></div>
               <div className="grid grid-cols-2 gap-3 pt-2">
